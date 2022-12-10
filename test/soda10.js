@@ -1,0 +1,301 @@
+/* Copyright (c) 2019, 2022, Oracle and/or its affiliates. */
+
+/******************************************************************************
+ *
+ * You may not use the identified files except in compliance with the Apache
+ * License, Version 2.0 (the "License.")
+ *
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * NAME
+ *   178. soda10.js
+ *
+ * DESCRIPTION
+ *   Test Soda Bulk insertion methods.
+ *
+ *****************************************************************************/
+'use strict';
+
+const oracledb = require('oracledb');
+const assert    = require('assert');
+const dbconfig = require('./dbconfig.js');
+const sodaUtil = require('./sodaUtil.js');
+const testsUtil = require('./testsUtil.js');
+
+describe('178. soda10.js', function() {
+
+  let runnable;
+  let conn, soda;
+
+  before(async function() {
+
+    const runnable = await testsUtil.isSodaRunnable();
+
+    if (!runnable) {
+      this.skip();
+      return;
+    } else {
+      conn = await oracledb.getConnection(dbconfig);
+      soda = conn.getSodaDatabase();
+    }
+
+    await sodaUtil.cleanup();
+
+  }); // before()
+
+  after(async function() {
+    if (!runnable) {
+      return;
+    }
+    try {
+      await conn.close();
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // after()
+
+  const inContents = [
+    { id: 1, name: "Paul",  office: "Singapore" },
+    { id: 2, name: "Emma",  office: "London" },
+    { id: 3, name: "Kate",  office: "Edinburgh" },
+    { id: 4, name: "Changjie",  office: "Shenzhen" }
+  ];
+
+  it('178.1 insertMany() with newSodaDocumentArray', async function() {
+    try {
+      const COLL = "soda_test_178_1";
+      const collection = await soda.createCollection(COLL);
+
+      let inDocuments = [];
+      for (let i = 0; i < inContents.length; i++) {
+        inDocuments[i] = soda.createDocument(inContents[i]); // n.b. synchronous method
+      }
+
+      await collection.insertMany(inDocuments);
+
+      // Fetch back
+      let outDocuments = await collection.find().getDocuments();
+      let outContents = [];
+      for (let i = 0; i < outDocuments.length; i++) {
+        outContents[i] = outDocuments[i].getContent(); // n.b. synchronous method
+      }
+
+      assert.deepEqual(outContents, inContents);
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.1
+
+  it('178.2 insertMany() with newSodaDocumentContentArray', async function() {
+    try {
+      const COLL = "soda_test_178_2";
+      const collection = await soda.createCollection(COLL);
+
+      await collection.insertMany(inContents);
+
+      // Fetch back
+      let outDocuments = await collection.find().getDocuments();
+      let outContents = [];
+      for (let i = 0; i < outDocuments.length; i++) {
+        outContents[i] = outDocuments[i].getContent(); // n.b. synchronous method
+      }
+
+      assert.deepEqual(outContents, inContents);
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.2
+
+  it('178.3 insertManyAndGet() with newDocumentArray', async function() {
+    try {
+      const COLL = "soda_test_178_3";
+      const collection = await soda.createCollection(COLL);
+
+      let inDocuments = [];
+      for (let i = 0; i < inContents.length; i++) {
+        inDocuments[i] = soda.createDocument(inContents[i]); // n.b. synchronous method
+      }
+
+      let middleDocuments = await collection.insertManyAndGet(inDocuments);
+      let middleContents = [];
+      for (let i = 0; i < middleDocuments.length; i++) {
+        middleContents[i] = middleDocuments[i].getContent();
+        assert(middleDocuments[i].key);
+      }
+      assert.deepEqual(middleContents, [null, null, null, null]);
+
+      // Fetch back
+      let outDocuments = await collection.find().getDocuments();
+      let outContents = [];
+      for (let i = 0; i < outDocuments.length; i++) {
+        outContents[i] = outDocuments[i].getContent(); // n.b. synchronous method
+      }
+
+      assert.deepEqual(outContents, inContents);
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.3
+
+  it('178.4 insertManyAndGet() with newDocumentContentArray', async function() {
+    try {
+      const COLL = "soda_test_178_4";
+      const collection = await soda.createCollection(COLL);
+
+      let middleDocuments = await collection.insertManyAndGet(inContents);
+      let middleContents = [];
+      for (let i = 0; i < middleDocuments.length; i++) {
+        middleContents[i] = middleDocuments[i].getContent();
+        assert(middleDocuments[i].key);
+      }
+      assert.deepEqual(middleContents, [null, null, null, null]);
+
+      // Fetch back
+      let outDocuments = await collection.find().getDocuments();
+      let outContents = [];
+      for (let i = 0; i < outDocuments.length; i++) {
+        outContents[i] = outDocuments[i].getContent(); // n.b. synchronous method
+      }
+
+      assert.deepEqual(outContents, inContents);
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.4
+
+  it('178.5 Negative - insertMany() with an empty array', async function() {
+    try {
+      const COLL = "soda_test_178_5";
+      const collection = await soda.createCollection(COLL);
+
+      await testsUtil.assertThrowsAsync(
+        async function() {
+          await collection.insertMany([]);
+        },
+        /NJS-005/
+      );
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.5
+
+  it('178.6 Negative - insertManyAndGet() with an empty array', async function() {
+    try {
+      const COLL = "soda_test_178_6";
+      const collection = await soda.createCollection(COLL);
+
+      await testsUtil.assertThrowsAsync(
+        async function() {
+          await collection.insertManyAndGet([]);
+        },
+        /NJS-005/
+      );
+
+      await conn.commit();
+
+      let res = await collection.drop();
+      assert.strictEqual(res.dropped, true);
+    } catch (err) {
+      assert.fail(err);
+    }
+  }); // 178.6
+
+  it('178.7 insertManyAndGet() with hint option', async function() {
+    // The SODA hint is available with Oracle Client 21.3 and
+    // in 19 from 19.11
+    if (oracledb.oracleClientVersion < 2103000000) {
+      if (oracledb.oracleClientVersion < 1911000000 ||
+          oracledb.oracleClientVersion >= 2000000000) {
+        this.skip();
+        return;
+      }
+    }
+    const COLL = "soda_test_178_7";
+    const collection = await soda.createCollection(COLL);
+
+    let inDocuments = [];
+    for (let i = 0; i < inContents.length; i++) {
+      inDocuments[i] = soda.createDocument(inContents[i]); // n.b. synchronous method
+    }
+
+    let options = {hint: "MONITOR"};
+    let middleDocuments = await collection.insertManyAndGet(inDocuments, options);
+    let middleContents = [];
+    for (let i = 0; i < middleDocuments.length; i++) {
+      middleContents[i] = middleDocuments[i].getContent();
+      assert(middleDocuments[i].key);
+    }
+    assert.deepEqual(middleContents, [null, null, null, null]);
+
+    // Fetch back
+    let outDocuments = await collection.find().hint("MONITOR").getDocuments();
+    let outContents = [];
+    for (let i = 0; i < outDocuments.length; i++) {
+      outContents[i] = outDocuments[i].getContent(); // n.b. synchronous method
+    }
+
+    assert.deepEqual(outContents, inContents);
+
+    await conn.commit();
+
+    let res = await collection.drop();
+    assert.strictEqual(res.dropped, true);
+  }); // 178.7
+
+  it('178.8 Negative - insertManyAndGet() with invalid options parameter', async function() {
+    const COLL = "soda_test_178_8";
+    const collection = await soda.createCollection(COLL);
+
+    let inDocuments = [];
+    for (let i = 0; i < inContents.length; i++) {
+      inDocuments[i] = soda.createDocument(inContents[i]); // n.b. synchronous method
+    }
+
+    let options = 3;
+    await testsUtil.assertThrowsAsync(
+      async function() {
+        await collection.insertManyAndGet(inDocuments, options);
+      },
+      /NJS-005/
+    );
+
+    await conn.commit();
+
+    let res = await collection.drop();
+    assert.strictEqual(res.dropped, true);
+  }); // 178.8
+
+});

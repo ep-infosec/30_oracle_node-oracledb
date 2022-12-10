@@ -1,0 +1,174 @@
+/* Copyright (c) 2018, 2022, Oracle and/or its affiliates. */
+
+/******************************************************************************
+ *
+ * You may not use the identified files except in compliance with the Apache
+ * License, Version 2.0 (the "License.")
+ *
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0.
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * NAME
+ *   168. soda4.js
+ *
+ * DESCRIPTION
+ *   sodaDocument class
+ *
+ *****************************************************************************/
+'use strict';
+
+const oracledb = require('oracledb');
+const assert    = require('assert');
+const dbconfig = require('./dbconfig.js');
+const sodaUtil = require('./sodaUtil.js');
+const testsUtil = require('./testsUtil.js');
+
+describe('168. soda4.js', () => {
+
+  before(async function() {
+    const runnable = await testsUtil.isSodaRunnable();
+    if (!runnable) {
+      this.skip();
+      return;
+    }
+
+    await sodaUtil.cleanup();
+  });
+
+  it('168.1 insertOneAndGet() fetches attributes without content', async () => {
+    let conn;
+    try {
+      conn = await oracledb.getConnection(dbconfig);
+      let sd = conn.getSodaDatabase();
+      let collectionName = 'soda_test_168_1';
+      let coll = await sd.createCollection(collectionName);
+
+      // Insert a new document
+      let testContent = {
+        name:    "Changjie Lin",
+        address: {city: "Shenzhen", country: "China"},
+        company: "Oracle Corporation",
+        manager: null,
+        VP:      "Bruce"
+      };
+
+      let myDoc = await coll.insertOneAndGet(testContent);
+      let myKey = myDoc.key;
+      assert(myKey);
+      assert.strictEqual(typeof (myKey), "string");
+      assert.strictEqual(typeof (myDoc), "object");
+
+      let content1 = myDoc.getContent();
+      assert.ifError(content1);
+
+      // Fetch it back
+      let doc2 = await coll.find().key(myKey).getOne();
+      let content2 = doc2.getContent();
+      assert.strictEqual(content2.name, testContent.name);
+      assert.strictEqual(content2.company, testContent.company);
+      assert.strictEqual(content2.manager, null);
+
+      await conn.commit();
+      let res = await coll.drop();
+      assert.strictEqual(res.dropped, true);
+
+    } catch (err) {
+      assert.fail(err);
+    } finally {
+      if (conn) {
+        try {
+          await conn.close();
+        } catch (err) {
+          assert.fail(err);
+        }
+      }
+    }
+  }); // 168.1
+
+  it('168.2 content is null', async () => {
+    let conn;
+    try {
+      conn = await oracledb.getConnection(dbconfig);
+      let sd = conn.getSodaDatabase();
+      let collectionName = 'soda_test_168_2';
+      let coll = await sd.createCollection(collectionName);
+
+      // Insert a new document
+      // Content is empty
+      let testContent = {};
+
+      let myDoc = await coll.insertOneAndGet(testContent);
+      let myKey = myDoc.key;
+      assert(myKey);
+      assert.strictEqual(typeof (myKey), "string");
+      assert.strictEqual(typeof (myDoc), "object");
+
+      // Fetch it back
+      let doc2 = await coll.find().key(myKey).getOne();
+      let content2 = doc2.getContent();
+      assert.deepEqual(content2, testContent);
+
+      await conn.commit();
+      let res = await coll.drop();
+      assert.strictEqual(res.dropped, true);
+
+    } catch (err) {
+      assert.fail(err);
+    } finally {
+      if (conn) {
+        try {
+          await conn.close();
+        } catch (err) {
+          assert.fail(err);
+        }
+      }
+    }
+  }); // 168.2
+
+  it('168.3 get mediaType', async () => {
+    let conn;
+    try {
+      conn = await oracledb.getConnection(dbconfig);
+      let sd = conn.getSodaDatabase();
+      let collectionName = 'soda_test_168_3';
+      let coll = await sd.createCollection(collectionName);
+
+      // Insert a new document
+      // Content is empty
+      let testContent = {};
+
+      let myDoc = await coll.insertOneAndGet(testContent);
+      let myMediaType = myDoc.mediaType;
+      assert(myMediaType);
+      assert.strictEqual(myMediaType, 'application/json');
+      let myKey = myDoc.key;
+
+      // Fetch it back
+      let doc2 = await coll.find().key(myKey).getOne();
+      assert.strictEqual(doc2.mediaType, 'application/json');
+
+      await conn.commit();
+      let res = await coll.drop();
+      assert.strictEqual(res.dropped, true);
+
+    } catch (err) {
+      assert.fail(err);
+    } finally {
+      if (conn) {
+        try {
+          await conn.close();
+        } catch (err) {
+          assert.fail(err);
+        }
+      }
+    }
+  }); // 168.3
+
+});
